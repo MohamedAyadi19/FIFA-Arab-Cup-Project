@@ -1,5 +1,5 @@
-Testing Strategy & Validation
-1. Testing Overview
+##Testing Strategy & Validation
+1. #Testing Overview
 
 Testing was carried out to ensure the correctness, security, and reliability of the Arab Cup API and its associated frontend application.
 The validation process focuses on API endpoints, authentication mechanisms, database consistency, cartography features, and error handling.
