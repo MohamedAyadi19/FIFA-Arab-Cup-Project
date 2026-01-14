@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIFA Arab Cup API Frontend</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Display Arab Cup Countries Table with Flags -->
+    <div id="arabCountries">
+        <h3>Arab Cup Participating Countries</h3>
+        <table id="countriesTable">
+            <thead>
+                <tr>
+                    <th>Flag</th>
+                    <th>Country</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="login">
+        <h2>Login to Sync Data</h2>
+        <form id="loginForm">
+            <input type="text" id="username" placeholder="Username" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+    </div>
+
+    <div id="syncForms" style="display:none;">
+        <h2>Sync Data</h2>
+        <button id="syncTeamsBtn">Sync Teams</button>
+        <button id="syncMatchesBtn">Sync Matches</button>
+        <button id="syncPlayersBtn">Sync Players</button>
+        <div id="syncStatus" style="margin-top: 15px; padding: 10px; display: none; background-color: #333; border-radius: 5px;">
+            <p id="statusMessage"></p>
+            <div id="progressBar" style="width: 100%; height: 20px; background-color: #555; border-radius: 5px; margin-top: 10px; overflow: hidden;">
+                <div id="progressFill" style="height: 100%; background-color: #28a745; width: 0%; transition: width 0.3s;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard" style="display:none;">
+        <h2>FIFA Arab Cup API Frontend</h2>
+
+        <div id="teams">
+            <h3>Teams</h3>
+            <div id="teamFlags"></div> <!-- Display Team Flags and Names -->
+        </div>
+
+        <div id="matches">
+            <h3>All Matches</h3>
+            <label for="countryFilter">Filter by Country:</label>
+            <select id="countryFilter">
+                <!-- Filter options will be dynamically added here -->
+            </select>
+            <div id="allMatches"></div> <!-- Display All Matches -->
+        </div>
+
+        <div id="players">
+            <h3>Players</h3>
+            <div id="playersList"></div> <!-- Display Players -->
+        </div>
+
+        <div id="lineup">
+            <h3>Lineup Cartography</h3>
+            <div class="lineup-controls">
+                <label for="lineupTeam">Team:</label>
+                <select id="lineupTeam"></select>
+                <label for="lineupFormation">Formation:</label>
+                <select id="lineupFormation"></select>
+            </div>
+            <div id="lineupStatus" class="placeholder"></div>
+            <div id="pitchContainer">
+                <div id="pitch"></div>
+                <div id="bench"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

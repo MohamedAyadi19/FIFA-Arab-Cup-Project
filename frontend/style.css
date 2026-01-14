@@ -1,0 +1,229 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #1c1c1c;
+    color: #fff;
+    text-align: center;
+    padding: 20px;
+}
+
+#login input, #login button {
+    margin: 10px;
+    padding: 10px;
+}
+
+button {
+    background-color: #28a745;
+    color: white;
+    border: none;
+    cursor: pointer;
+    padding: 10px 20px;
+    margin-top: 10px;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #218838;
+}
+
+button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+#teams, #matches, #players, #arabCountries {
+    margin-top: 30px;
+}
+
+#lineup {
+    margin-top: 40px;
+}
+
+#teamFlags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.flag-icon {
+    width: 48px;
+    height: auto;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+.team-card {
+    background-color: #333;
+    border-radius: 8px;
+    width: 150px;
+    margin: 10px;
+    padding: 10px;
+    text-align: center;
+}
+
+.team-card img {
+    width: 50px;
+    height: 50px;
+}
+
+.team-country {
+    margin: 4px 0 0;
+    color: #9ad7b8;
+    font-size: 13px;
+}
+
+#allMatches, #playersList {
+    margin-top: 20px;
+}
+
+#countriesTable {
+    width: 50%;
+    margin: 0 auto;
+    border-collapse: collapse;
+}
+
+#countriesTable th, #countriesTable td {
+    padding: 10px;
+    text-align: center;
+}
+
+select {
+    padding: 5px;
+    background-color: #333;
+    color: #fff;
+}
+
+.match-card, .player-card {
+    background-color: #333;
+    margin: 10px;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+.country-section {
+    margin: 30px 0;
+    padding: 20px;
+    background-color: #2a2a2a;
+    border-radius: 10px;
+}
+
+.country-section h3 {
+    color: #28a745;
+    margin-bottom: 15px;
+    font-size: 24px;
+}
+
+.players-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+    padding: 10px;
+}
+
+.player-card {
+    background-color: #3a3a3a;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    transition: transform 0.2s;
+}
+
+.player-card:hover {
+    transform: translateY(-5px);
+    background-color: #444;
+}
+
+.player-card h4 {
+    margin: 5px 0;
+    color: #fff;
+    font-size: 16px;
+}
+
+.player-card p {
+    margin: 5px 0;
+    color: #aaa;
+    font-size: 14px;
+}
+
+.placeholder {
+    color: #aaa;
+    font-style: italic;
+}
+
+.lineup-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 10px 0 20px;
+}
+
+#pitchContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+#pitch {
+    position: relative;
+    width: min(90vw, 520px);
+    aspect-ratio: 2 / 3;
+    background: linear-gradient(0deg, #0c6c3c 0%, #0f8a47 100%);
+    border: 3px solid #0b4728;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    overflow: hidden;
+}
+
+.pitch-line {
+    position: absolute;
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 6px;
+}
+
+.slot {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: rgba(0,0,0,0.25);
+    border: 2px solid rgba(255,255,255,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 11px;
+    text-align: center;
+    padding: 4px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.slot:hover {
+    transform: translate(-50%, -50%) scale(1.04);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.35);
+}
+
+.role-gk { background-color: #1b3a6f; }
+.role-def { background-color: #14532d; }
+.role-mid { background-color: #74520f; }
+.role-fwd { background-color: #7a1b1b; }
+.slot-empty { background-color: rgba(255,255,255,0.12); color: #ccc; }
+
+#bench {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    max-width: min(90vw, 560px);
+}
+
+.bench-chip {
+    background: #2f2f2f;
+    border: 1px solid #444;
+    border-radius: 16px;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #ddd;
+}
