@@ -53,12 +53,3 @@ Thumbs.db
 # Docker
 *.dockerignore
 
-# LaTeX
-*.aux
-*.log
-*.out
-*.toc
-*.fdb_latexmk
-*.fls
-*.synctex.gz
-*.pdf
