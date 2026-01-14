@@ -16,7 +16,7 @@ A full-stack web application for managing Arab Cup tournament data, including te
 - **Python/Flask** - REST API framework
 - **SQLAlchemy** - ORM for database management
 - **JWT** - Authentication and authorization
-- **Flask-CORS** - Cross-origin resource sharing
+- **Flask** - Backend Python Framework
 
 ### Frontend
 - **HTML/CSS/JavaScript** - Clean and responsive UI
