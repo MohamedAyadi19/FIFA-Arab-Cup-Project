@@ -1,19 +1,19 @@
 from flask import Blueprint, jsonify
-from services.csv_data_service import get_all_matches
+from services.db_data_service import get_all_matches
 
 matches_bp = Blueprint("matches", __name__, url_prefix="/api/matches")
 
 @matches_bp.route("/", methods=["GET"])
 def get_matches():
     """
-    Get All Matches from CSV
+    Get All Matches from Database
     
     Loads all matches from matches.csv with complete match context:
     - Match details (date, home team, away team, venue, referee)
     - Match results (goals, shots, xG, cards, attendance)
     - League context (average goals, BTTS %, clean sheet % from league.csv)
     
-    All data is sourced exclusively from CSV files with no external API calls.
+    All data is sourced from the relational database.
     ---
     tags:
       - Matches
@@ -50,22 +50,6 @@ def get_matches():
                 type: number
                 example: 49
     """
-    # Load matches from CSV with league context
+    # Load matches from database
     matches = get_all_matches()
-    
-    # Convert numpy types and handle NaN values for JSON serialization
-    import numpy as np
-    import math
-    
-    def convert_value(v):
-        if isinstance(v, (np.integer, np.int64)):
-            return int(v)
-        elif isinstance(v, (np.floating, np.float64)):
-            if math.isnan(v) or math.isinf(v):
-                return None
-            return float(v)
-        return v
-    
-    matches = [{k: convert_value(v) for k, v in match.items()} for match in matches]
-    
     return jsonify(matches)

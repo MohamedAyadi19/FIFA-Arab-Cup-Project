@@ -90,8 +90,15 @@ def create_app():
         return send_from_directory(frontend_folder, 'index.html')
 
     with app.app_context():
-        from models import Match
+        from models import Match, Team
         db.create_all()
+
+        # Auto-import CSV data into the database if empty
+        try:
+            if Team.query.count() == 0:
+                clean_import_from_csv()
+        except Exception as exc:
+            print(f"⚠️  Auto-import skipped due to error: {exc}")
     
     # Register Flask CLI commands
     @app.cli.command("clean-import")

@@ -1,12 +1,12 @@
 from flask import Blueprint, jsonify
-from services.csv_data_service import get_all_teams, get_team_stats
+from services.db_data_service import get_all_teams, get_team_stats
 
 teams_bp = Blueprint("teams", __name__, url_prefix="/api/teams")
 
 @teams_bp.route("/", methods=["GET"])
 def get_teams():
     """
-    Get All Teams from CSV
+    Get All Teams from Database
     
     Loads all teams from teams.csv with complete team statistics:
     - Team identity (name, country, badge)
@@ -15,7 +15,7 @@ def get_teams():
     - Tactical stats (possession, corners, cards, xG)
     - Player count and aggregate player stats
     
-    All data is sourced exclusively from CSV files with no external API calls.
+    All data is sourced from the relational database.
     ---
     tags:
       - Teams
@@ -50,23 +50,8 @@ def get_teams():
               total_assists:
                 type: integer
     """
-    # Load teams from CSV with aggregated stats
+    # Load teams from database with aggregated stats
     teams = get_all_teams()
-    
-    # Convert numpy types and handle NaN values for JSON serialization
-    import numpy as np
-    import math
-    
-    def convert_value(v):
-        if isinstance(v, (np.integer, np.int64)):
-            return int(v)
-        elif isinstance(v, (np.floating, np.float64)):
-            if math.isnan(v) or math.isinf(v):
-                return None
-            return float(v)
-        return v
-    
-    teams = [{k: convert_value(v) for k, v in team.items()} for team in teams]
     
     return jsonify(teams)
 

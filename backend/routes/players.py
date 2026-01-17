@@ -1,9 +1,5 @@
 from flask import Blueprint, jsonify, request
-from services.csv_data_service import (
-    get_all_players, get_players_by_team, get_leaderboard, CSVDataService
-)
-from services.statistics_calculator import PlayerStatsCalculator, LeaderboardCalculator
-from models import Team, Player, PlayerStatistics
+from services.db_data_service import get_all_players
 
 
 players_bp = Blueprint("players", __name__, url_prefix="/api/players")
@@ -13,7 +9,7 @@ def get_players():
     """
     Get All Players with Position-Aware Stats
     
-    Loads players from CSV with intelligent stat filtering based on position.
+    Loads players from the relational database with position-aware stats.
     Each player receives position-relevant statistics:
     - Goalkeepers: clean_sheets, saves_per_game, save_percentage, conceded_per_90
     - Defenders: clean_sheets, tackles_per_90, interceptions, aerial_duels, blocks, clearances
@@ -72,7 +68,7 @@ def get_players():
     team_filter = request.args.get('team', '').lower()
     position_filter = request.args.get('position', '').lower()
     
-    # Load all players from CSV with position-aware stats
+    # Load all players from the database with position-aware stats
     players = get_all_players()
     
     # Apply team filter if specified (filter by nationality, not club)
@@ -82,21 +78,6 @@ def get_players():
     # Apply position filter if specified
     if position_filter:
         players = [p for p in players if (p.get('position') or '').lower() == position_filter]
-    
-    # Convert numpy types and handle NaN values for JSON serialization
-    import numpy as np
-    import math
-    
-    def convert_value(v):
-        if isinstance(v, (np.integer, np.int64)):
-            return int(v)
-        elif isinstance(v, (np.floating, np.float64)):
-            if math.isnan(v) or math.isinf(v):
-                return None
-            return float(v)
-        return v
-    
-    players = [{k: convert_value(v) for k, v in player.items()} for player in players]
     
     return jsonify(players)
 

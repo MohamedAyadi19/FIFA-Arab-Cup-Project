@@ -1,7 +1,5 @@
 from flask import Blueprint, jsonify, request
-from services.csv_data_service import get_leaderboard, get_all_teams, CSVDataService
-from services.statistics_calculator import LeaderboardCalculator
-from models import PlayerStatistics, TeamStatistics
+from services.db_data_service import get_leaderboard, get_all_teams
 
 leaderboards_bp = Blueprint("leaderboards", __name__, url_prefix="/api/leaderboards")
 
@@ -9,10 +7,9 @@ leaderboards_bp = Blueprint("leaderboards", __name__, url_prefix="/api/leaderboa
 @leaderboards_bp.route("/top-scorers", methods=["GET"])
 def get_top_scorers():
     """
-    Get Top Scorers Leaderboard from CSV
+    Get Top Scorers Leaderboard from Database
     
-    Loads top scorers from players.csv, sorted by goals_overall.
-    Data is sourced exclusively from CSV files.
+    Loads top scorers from the relational database, sorted by goals_overall.
     ---
     tags:
       - Leaderboards
@@ -52,10 +49,9 @@ def get_top_scorers():
 @leaderboards_bp.route("/top-assists", methods=["GET"])
 def get_top_assists():
     """
-    Get Top Assists Leaderboard from CSV
+    Get Top Assists Leaderboard from Database
     
-    Loads top assist providers from players.csv, sorted by assists_overall.
-    Data is sourced exclusively from CSV files.
+    Loads top assist providers from the relational database, sorted by assists_overall.
     ---
     tags:
       - Leaderboards
@@ -95,11 +91,9 @@ def get_top_assists():
 @leaderboards_bp.route("/top-defenders", methods=["GET"])
 def get_top_defenders():
     """
-    Get Top Defenders Leaderboard from CSV
+    Get Top Defenders Leaderboard from Database
     
-    Loads top defenders from players.csv, filtered by position and sorted by tackles_per_90_overall.
-    Position-aware filtering ensures only defensive stats from defenders are considered.
-    Data is sourced exclusively from CSV files.
+    Loads top defenders from the relational database, filtered by position and sorted by tackles_per_90_overall.
     ---
     tags:
       - Leaderboards
@@ -141,11 +135,10 @@ def get_top_defenders():
 @leaderboards_bp.route("/standings", methods=["GET"])
 def get_standings():
     """
-    Get Team Standings from CSV
+    Get Team Standings from Database
     
-    Loads team standings from teams.csv, sorted by points/performance.
+    Loads team standings from database, sorted by points/performance.
     Includes team performance metrics (wins, draws, losses, goals, clean sheets).
-    Data is sourced exclusively from CSV files.
     ---
     tags:
       - Leaderboards

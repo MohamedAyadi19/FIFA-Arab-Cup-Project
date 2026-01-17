@@ -4,7 +4,7 @@ All data is sourced exclusively from CSV files with no external API calls.
 """
 
 from flask import Blueprint, jsonify
-from services.csv_data_service import get_league_stats, get_team_stats, CSVDataService
+from services.db_data_service import get_league_stats, get_team_stats
 
 
 statistics_bp = Blueprint("statistics", __name__, url_prefix="/api/statistics")
@@ -13,7 +13,7 @@ statistics_bp = Blueprint("statistics", __name__, url_prefix="/api/statistics")
 @statistics_bp.route("/league", methods=["GET"])
 def get_league_statistics():
     """
-    Get League-Wide Statistics from CSV
+    Get League-Wide Statistics
     
     Loads aggregated league statistics from league.csv including:
     - Match aggregates: average goals per match, BTTS percentage, clean sheet percentage
@@ -21,7 +21,7 @@ def get_league_statistics():
     - Tactical stats: average corners, cards, xG metrics
     - Performance metrics: win/draw/loss distribution
     
-    All data is sourced exclusively from CSV files with no external API calls.
+    League aggregates are sourced from the league dataset.
     ---
     tags:
       - Statistics
@@ -57,7 +57,7 @@ def get_league_statistics():
 @statistics_bp.route("/league/summary", methods=["GET"])
 def get_league_summary():
     """
-    Get League Summary from CSV
+    Get League Summary
     
     Returns a concise summary of key league-wide metrics for dashboard display.
     ---
@@ -97,7 +97,7 @@ def get_league_summary():
 @statistics_bp.route("/teams/<team_name>", methods=["GET"])
 def get_team_statistics(team_name):
     """
-    Get Team Statistics from CSV
+    Get Team Statistics from Database
     
     Loads team statistics from teams.csv with:
     - Team performance (matches, wins, draws, losses)
@@ -106,7 +106,7 @@ def get_team_statistics(team_name):
     - Player aggregate stats (total players, goals, assists)
     - League context for comparison
     
-    All data is sourced exclusively from CSV files.
+    Team statistics are sourced from the relational database.
     ---
     tags:
       - Statistics
