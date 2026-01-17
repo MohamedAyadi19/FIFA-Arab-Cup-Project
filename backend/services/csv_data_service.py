@@ -27,6 +27,22 @@ class CSVDataService:
     _players_df = None
     _matches_df = None
     _league_df = None
+
+    # Map common abbreviations to canonical names
+    _team_name_map = {
+        'uae': 'united arab emirates',
+        'ksa': 'saudi arabia'
+    }
+
+    @classmethod
+    def _normalize_team_name(cls, name):
+        """Normalize team names/abbreviations for matching."""
+        if not isinstance(name, str):
+            return ''
+        trimmed = name.strip()
+        lowered = trimmed.lower()
+        mapped = cls._team_name_map.get(trimmed) or cls._team_name_map.get(lowered) or cls._team_name_map.get(trimmed.upper())
+        return (mapped or lowered).strip()
     
     @staticmethod
     def _clean_nan(data):
@@ -84,8 +100,9 @@ class CSVDataService:
     @classmethod
     def get_team_by_name(cls, country):
         """Get team by country name"""
+        target = cls._normalize_team_name(country)
         teams = cls.load_teams()
-        team = teams[teams['country'].str.lower() == country.lower()]
+        team = teams[teams.apply(lambda r: cls._normalize_team_name(r.get('country') or r.get('common_name') or r.get('team_name')) == target, axis=1)]
         if len(team) > 0:
             return cls._clean_nan(team.iloc[0].to_dict())
         return None
@@ -290,8 +307,10 @@ class CSVDataService:
         matches = cls.load_matches()
         league = cls.load_league()
         
-        # Get team from CSV
-        team_row = teams[teams['country'].str.lower() == team_country.lower()]
+        target = cls._normalize_team_name(team_country)
+
+        # Get team from CSV (country/common_name/team_name)
+        team_row = teams[teams.apply(lambda r: cls._normalize_team_name(r.get('country') or r.get('common_name') or r.get('team_name')) == target, axis=1)]
         if len(team_row) == 0:
             return None
         
@@ -312,8 +331,8 @@ class CSVDataService:
             except:
                 team_stats[col] = 0
         
-        # Aggregate player-level stats for this team
-        team_players = players[players['Current Club'].str.lower() == team_country.lower()]
+        # Aggregate player-level stats for this team (match on normalized Current Club)
+        team_players = players[players['Current Club'].apply(lambda v: cls._normalize_team_name(v)) == target]
         
         if len(team_players) > 0:
             # Aggregate stats across all players in team

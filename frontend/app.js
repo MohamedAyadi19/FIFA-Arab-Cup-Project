@@ -93,8 +93,18 @@ function getPlayerName(player) {
 }
 
 function normalizeMatch(match) {
-    const homeTeam = match.home_team_name || match.home_team || match.HomeTeam || match["Home Team"] || match.country_home || "Unknown";
-    const awayTeam = match.away_team_name || match.away_team || match.AwayTeam || match["Away Team"] || match.country_away || "Unknown";
+    let homeTeam = match.home_team_name || match.home_team || match.HomeTeam || match["Home Team"] || match.country_home || "Unknown";
+    let awayTeam = match.away_team_name || match.away_team || match.AwayTeam || match["Away Team"] || match.country_away || "Unknown";
+    
+    // Map CSV abbreviations to full country names
+    const teamAbbreviationMap = {
+        "UAE": "United Arab Emirates",
+        "KSA": "Saudi Arabia"
+    };
+    
+    homeTeam = teamAbbreviationMap[homeTeam] || homeTeam;
+    awayTeam = teamAbbreviationMap[awayTeam] || awayTeam;
+    
     const homeScore = match.home_team_goal_count ?? match.home_score ?? match["home_score"] ?? match["Home Score"] ?? 0;
     const awayScore = match.away_team_goal_count ?? match.away_score ?? match["away_score"] ?? match["Away Score"] ?? 0;
     const date = match.date_GMT || match.date || match.match_date || match.timestamp || "";

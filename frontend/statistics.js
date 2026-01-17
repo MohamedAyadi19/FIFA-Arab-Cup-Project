@@ -539,6 +539,21 @@ const StatisticsModule = {
     /**
      * Load team list for selector
      */
+    // Map CSV abbreviations to full country names
+    teamAbbreviationMap: {
+        "UAE": "United Arab Emirates",
+        "KSA": "Saudi Arabia"
+    },
+
+    normalizeCountry(country) {
+        if (!country) return "";
+        const trimmed = String(country).trim();
+        const upper = trimmed.toUpperCase();
+        const lower = trimmed.toLowerCase();
+        const mapped = this.teamAbbreviationMap[trimmed] || this.teamAbbreviationMap[upper] || this.teamAbbreviationMap[lower];
+        return (mapped || trimmed).replace(/\s+/g, ' ').trim();
+    },
+
     async loadTeamSelector() {
         try {
             const response = await fetch(`${window.apiUrl || 'http://localhost:5000'}/api/teams/`);
@@ -552,11 +567,15 @@ const StatisticsModule = {
             }
             
             teams
-                .filter(team => !allowedCountries.size || allowedCountries.has(team.country))
+                .filter(team => {
+                    const normalizedCountry = this.normalizeCountry(team.country || team.common_name || team.team_name);
+                    return !allowedCountries.size || allowedCountries.has(normalizedCountry);
+                })
                 .forEach(team => {
+                    const normalizedCountry = this.normalizeCountry(team.country || team.common_name || team.team_name);
                     const option = document.createElement('option');
-                    option.value = team.country;
-                    option.textContent = team.team_name || `${team.country} National Team`;
+                    option.value = normalizedCountry;
+                    option.textContent = team.team_name || `${normalizedCountry} National Team`;
                     selector.appendChild(option);
                 });
 
@@ -578,12 +597,19 @@ const StatisticsModule = {
             console.log('Loading stats for team:', teamName);
             const response = await fetch(`${window.apiUrl || 'http://localhost:5000'}/api/teams/`);
             const teams = await response.json();
-            const team = teams.find(t => t.country.toLowerCase() === teamName.toLowerCase());
+
+            // Normalize both the selected name and the team country from API
+            const selected = this.normalizeCountry(teamName).toLowerCase();
+            const team = teams.find(t => {
+                const candidates = [t.country, t.common_name, t.team_name];
+                return candidates.some(name => this.normalizeCountry(name).toLowerCase() === selected);
+            });
             
             console.log('Found team:', team);
             
             if (team) {
-                const statsResponse = await fetch(`${window.apiUrl || 'http://localhost:5000'}/api/statistics/teams/${encodeURIComponent(teamName)}`);
+                const statsKey = this.normalizeCountry(team.country || team.common_name || team.team_name);
+                const statsResponse = await fetch(`${window.apiUrl || 'http://localhost:5000'}/api/statistics/teams/${encodeURIComponent(statsKey)}`);
                 console.log('Stats response status:', statsResponse.status);
                 
                 if (!statsResponse.ok) {
