@@ -1,47 +1,102 @@
-from flask import Blueprint, jsonify
-from services.sportsdb_service import fetch_players_by_team, save_players_to_db
-from models import Team, Player
-from auth_utils import token_required
-import time
+from flask import Blueprint, jsonify, request
+from services.csv_data_service import (
+    get_all_players, get_players_by_team, get_leaderboard, CSVDataService
+)
+from services.statistics_calculator import PlayerStatsCalculator, LeaderboardCalculator
+from models import Team, Player, PlayerStatistics
 
 
 players_bp = Blueprint("players", __name__, url_prefix="/api/players")
 
-@players_bp.route("/sync", methods=["POST"])
-@token_required
-def sync_players():
-    # Arab Cup countries only
-    arab_cup_countries = [
-        "Qatar", "Tunisia", "Syria", "Palestine", "Morocco", "Saudi Arabia", "Oman", "Comoros",
-        "Egypt", "Jordan", "United Arab Emirates", "Kuwait", "Algeria", "Iraq", "Bahrain", "Sudan"
-    ]
-    
-    teams = Team.query.filter(Team.country.in_(arab_cup_countries)).all()
-    total = 0
-
-    for team in teams:
-        players = fetch_players_by_team(team.team_id)
-        if players:
-            count = save_players_to_db(players, team)
-            total += count
-            print(f"Synced {count} new players for team: {team.name}")
-        else:
-            print(f"No new players found for team: {team.name} (ID: {team.team_id})")
-        time.sleep(2)  # Respect API rate limit (free tier: 1 req per 2 seconds)
-
-    return jsonify({"status": "players synced", "count": total, "note": "Data merged with existing records"})
-
-
-
 @players_bp.route("/", methods=["GET"])
 def get_players():
-    players = Player.query.all()
-    return jsonify([
-        {
-            "name": p.name,
-            "position": p.position,
-            "nationality": p.nationality,
-            "team_id": p.team_id,
-            "team": Team.query.get(p.team_id).country if p.team_id and Team.query.get(p.team_id) else "Unknown"
-        } for p in players
-    ])
+    """
+    Get All Players with Position-Aware Stats
+    
+    Loads players from CSV with intelligent stat filtering based on position.
+    Each player receives position-relevant statistics:
+    - Goalkeepers: clean_sheets, saves_per_game, save_percentage, conceded_per_90
+    - Defenders: clean_sheets, tackles_per_90, interceptions, aerial_duels, blocks, clearances
+    - Midfielders: passes_per_90, key_passes, chances_created, tackles, goals, assists
+    - Forwards: goals, assists, shots_on_target, dribbles, xG metrics
+    
+    Query Parameters:
+    - team: Filter by team/country name
+    - position: Filter by position (Goalkeeper, Defender, Midfielder, Forward)
+    ---
+    tags:
+      - Players
+    parameters:
+      - name: team
+        in: query
+        type: string
+        description: Filter players by team/country name
+        enum: [Egypt, Algeria, Morocco, Tunisia, Saudi Arabia, Oman, Comoros, Palestine, Libya, Syria, South Sudan, Bahrain, Djibouti, Somalia, Yemen, Lebanon, Sudan, Qatar, Kuwait, Jordan, UAE, Iraq]
+        example: Egypt
+      - name: position
+        in: query
+        type: string
+        description: Filter by position category
+        enum: [Goalkeeper, Defender, Midfielder, Forward]
+        example: Forward
+    responses:
+      200:
+        description: List of all players with position-aware stats from CSV
+        schema:
+          type: array
+          items:
+            type: object
+            properties:
+              full_name:
+                type: string
+                example: Mohamed Salah
+              position:
+                type: string
+                example: Forward
+              player_type:
+                type: string
+                example: Forward
+              nationality:
+                type: string
+                example: Egypt
+              Current Club:
+                type: string
+                example: Egypt
+              goals_overall:
+                type: number
+                example: 47
+              assists_overall:
+                type: number
+                example: 18
+    """
+    team_filter = request.args.get('team', '').lower()
+    position_filter = request.args.get('position', '').lower()
+    
+    # Load all players from CSV with position-aware stats
+    players = get_all_players()
+    
+    # Apply team filter if specified (filter by nationality, not club)
+    if team_filter:
+        players = [p for p in players if (p.get('nationality') or '').lower() == team_filter]
+    
+    # Apply position filter if specified
+    if position_filter:
+        players = [p for p in players if (p.get('position') or '').lower() == position_filter]
+    
+    # Convert numpy types and handle NaN values for JSON serialization
+    import numpy as np
+    import math
+    
+    def convert_value(v):
+        if isinstance(v, (np.integer, np.int64)):
+            return int(v)
+        elif isinstance(v, (np.floating, np.float64)):
+            if math.isnan(v) or math.isinf(v):
+                return None
+            return float(v)
+        return v
+    
+    players = [{k: convert_value(v) for k, v in player.items()} for player in players]
+    
+    return jsonify(players)
+

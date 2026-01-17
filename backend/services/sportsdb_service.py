@@ -1,10 +1,11 @@
+import os
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 BASE_URL = "https://www.thesportsdb.com/api/v1/json/3"
-LEAGUE_ID = 5105
-SEASON = "2021"
+LEAGUE_ID = os.getenv("SPORTSDB_LEAGUE_ID", "5105")
+SEASON = os.getenv("SPORTSDB_SEASON", "2021")
 
 session = requests.Session()
 

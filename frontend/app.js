@@ -1,18 +1,51 @@
 const apiUrl = "http://localhost:5000"; // Backend URL
-let jwtToken = ""; // Store the JWT token
-let teamsLoaded = false;
-let matchesLoaded = false;
-let playersLoaded = false;
+window.apiUrl = apiUrl; // Make it globally accessible
+let jwtToken = ""; // Store the JWT token (session only - not persisted)
+// CSV data is already in database, so mark as loaded
+let teamsLoaded = true;
+let matchesLoaded = true;
+let playersLoaded = true;
 
 // Caches to reuse data for lineup view
 let teamsCache = [];
 let playersCache = [];
 
-// List of Arab Cup countries
-const arabCupCountries = [
-    "Qatar", "Tunisia", "Syria", "Palestine", "Morocco", "Saudi Arabia", "Oman", "Comoros",
-    "Egypt", "Jordan", "United Arab Emirates", "Kuwait", "Algeria", "Iraq", "Bahrain", "Sudan"
+// Will be populated from database
+let arabCupCountries = [];
+
+// Allowed Arab Cup teams (user-provided list)
+const allowedTeamNames = [
+    "Bahrain National Team",
+    "Syria National Team",
+    "Palestine National Team",
+    "Oman National Team",
+    "Lebanon National Team",
+    "Yemen National Team",
+    "Kuwait National Team",
+    "Libya National Team",
+    "Comoros National Team",
+    "Mauritania National Team",
+    "Sudan National Team",
+    "Djibouti National Team",
+    "South Sudan National Team",
+    "Somalia National Team",
+    "Jordan National Team",
+    "Saudi Arabia National Team",
+    "Qatar National Team",
+    "Iraq National Team",
+    "United Arab Emirates National Team",
+    "Algeria National Team",
+    "Morocco National Team",
+    "Egypt National Team",
+    "Tunisia National Team",
 ];
+
+// Expose allowlist and flags for other modules (statistics module uses it)
+window.allowedTeamNames = allowedTeamNames;
+
+function teamNameToCountry(name) {
+    return (name || "").replace(" National Team", "").trim();
+}
 
 // ISO flag mapping for consistent flag rendering
 const flagMap = {
@@ -27,12 +60,23 @@ const flagMap = {
     "Egypt": "https://flagcdn.com/w80/eg.png",
     "Jordan": "https://flagcdn.com/w80/jo.png",
     "United Arab Emirates": "https://flagcdn.com/w80/ae.png",
+    "UAE": "https://flagcdn.com/w80/ae.png",
     "Kuwait": "https://flagcdn.com/w80/kw.png",
     "Algeria": "https://flagcdn.com/w80/dz.png",
     "Iraq": "https://flagcdn.com/w80/iq.png",
     "Bahrain": "https://flagcdn.com/w80/bh.png",
-    "Sudan": "https://flagcdn.com/w80/sd.png"
+    "Sudan": "https://flagcdn.com/w80/sd.png",
+    "Djibouti": "https://flagcdn.com/w80/dj.png",
+    "South Sudan": "https://flagcdn.com/w80/ss.png",
+    "Somalia": "https://flagcdn.com/w80/so.png",
+    "Yemen": "https://flagcdn.com/w80/ye.png",
+    "Libya": "https://flagcdn.com/w80/ly.png",
+    "Mauritania": "https://flagcdn.com/w80/mr.png",
+    "Lebanon": "https://flagcdn.com/w80/lb.png"
 };
+
+// Share flag map for other modules that render player/team visuals
+window.flagMap = flagMap;
 
 const flagEmojiFallback = "🏴";
 
@@ -40,37 +84,117 @@ function getFlag(country) {
     return flagMap[country] || "";
 }
 
+function getPlayerCountry(player) {
+    return player?.nationality || player?.["Current Club"] || player?.team || player?.country || "";
+}
+
+function getPlayerName(player) {
+    return player?.full_name || player?.name || "Unknown";
+}
+
+function normalizeMatch(match) {
+    const homeTeam = match.home_team_name || match.home_team || match.HomeTeam || match["Home Team"] || match.country_home || "Unknown";
+    const awayTeam = match.away_team_name || match.away_team || match.AwayTeam || match["Away Team"] || match.country_away || "Unknown";
+    const homeScore = match.home_team_goal_count ?? match.home_score ?? match["home_score"] ?? match["Home Score"] ?? 0;
+    const awayScore = match.away_team_goal_count ?? match.away_score ?? match["away_score"] ?? match["Away Score"] ?? 0;
+    const date = match.date_GMT || match.date || match.match_date || match.timestamp || "";
+    const venue = match.stadium_name || match.venue || "";
+    const gameWeek = match['Game Week'] || match.game_week || 'N/A';
+    return { homeTeam, awayTeam, homeScore, awayScore, date, venue, gameWeek };
+}
+
 // Function to display team flags and names
 async function displayTeams() {
+    console.log('displayTeams called');
     const response = await fetch(`${apiUrl}/api/teams/`);
+    console.log('Teams response status:', response.status);
     const teams = await response.json();
-    teamsCache = teams; // cache
+    console.log('Teams data:', teams.length, 'teams loaded');
+
+    const allowedCountries = new Set(allowedTeamNames.map(teamNameToCountry));
+    const filteredTeams = teams.filter(t => allowedCountries.has(t.country) || allowedTeamNames.includes(t.team_name));
+
+    teamsCache = filteredTeams; // cache
     const teamsContainer = document.getElementById("teamFlags");
 
     // Clear previous content
     teamsContainer.innerHTML = "";
 
-    if (!teamsLoaded) {
-        teamsContainer.innerHTML = "<p class='placeholder'>Click \"Sync Teams\" to load teams.</p>";
-        return;
-    }
+    // Define tournament data for each team
+    const tournamentData = {
+        "Algeria": { position: "Quarter-final", group: "", topScorer: "-" },
+        "Bahrain": { position: "Group D", group: "Group D", topScorer: "-" },
+        "Comoros": { position: "Group B", group: "Group B", topScorer: "-" },
+        "Djibouti": { position: "Play-off", group: "", topScorer: "-" },
+        "Egypt": { position: "Quarter-final", group: "Group D", topScorer: "-" },
+        "Iraq": { position: "Group D", group: "Group D", topScorer: "-" },
+        "Jordan": { position: "Runner-up", group: "Group E", topScorer: "-" },
+        "Kuwait": { position: "Group E", group: "Group E", topScorer: "-" },
+        "Lebanon": { position: "Group A", group: "Group A", topScorer: "-" },
+        "Libya": { position: "Play-off", group: "", topScorer: "-" },
+        "Mauritania": { position: "Play-off", group: "", topScorer: "-" },
+        "Morocco": { position: "Champions", group: "Group C", topScorer: "-" },
+        "Oman": { position: "Group C", group: "Group C", topScorer: "-" },
+        "Palestine": { position: "Group A", group: "Group A", topScorer: "-" },
+        "Qatar": { position: "Semi-final", group: "Group A", topScorer: "-" },
+        "Saudi Arabia": { position: "Semi-final", group: "Group C", topScorer: "-" },
+        "Somalia": { position: "Play-off", group: "", topScorer: "-" },
+        "South Sudan": { position: "Play-off", group: "", topScorer: "-" },
+        "Sudan": { position: "Group D", group: "Group D", topScorer: "-" },
+        "Syria": { position: "Group A", group: "Group A", topScorer: "-" },
+        "Tunisia": { position: "Third place", group: "Group A", topScorer: "-" },
+        "United Arab Emirates": { position: "Semi-final", group: "Group B", topScorer: "-" },
+        "Yemen": { position: "Group B", group: "Group B", topScorer: "-" }
+    };
 
-    // Filter teams to display only Arab Cup teams
-    const filteredTeams = teams.filter(team => arabCupCountries.includes(team.country));
-
-    // Generate HTML for teams
+    // Display all teams with tournament info
     filteredTeams.forEach(team => {
         const teamCard = document.createElement("div");
-        teamCard.classList.add("team-card");
+        teamCard.classList.add("team-card-pro");
+        teamCard.dataset.country = team.country;
 
         const flagUrl = getFlag(team.country) || team.badge;
-        const flagImg = flagUrl ? `<img class="flag-icon" src="${flagUrl}" alt="${team.name} flag" loading="lazy">` : flagEmojiFallback;
+        const teamData = tournamentData[team.country] || { position: "Participant", group: "", topScorer: "-" };
+        
+        // Color classes based on achievement
+        let colorClass = "team-blue";
+        if (teamData.position === "Champions") colorClass = "team-gold";
+        else if (teamData.position === "Runner-up") colorClass = "team-silver";
+        else if (teamData.position.includes("Semi-final")) colorClass = "team-blue";
+        else if (teamData.position.includes("Quarter-final")) colorClass = "team-green";
+        else if (teamData.position.includes("Play-off")) colorClass = "team-light-blue";
+        else if (teamData.position.includes("Group")) colorClass = "team-red";
 
         teamCard.innerHTML = `
-            ${flagImg}
-            <h4>${team.name}</h4>
-            <p class="team-country">${team.country}</p>
+            <div class="team-header ${colorClass}">
+                ${flagUrl ? `<img class="team-flag-large" src="${flagUrl}" alt="${team.country}">` : flagEmojiFallback}
+                <div class="team-badges">
+                    ${team.badge ? `<img class="team-badge-icon" src="${team.badge}" alt="Badge">` : ''}
+                </div>
+            </div>
+            <div class="team-content">
+                <h3 class="team-name-large">${team.country}</h3>
+                <div class="team-info-row">
+                    <span class="info-label">Final position</span>
+                    <span class="info-value">${teamData.position}</span>
+                </div>
+                ${teamData.group ? `<div class="team-info-row"><span class="info-label">Group</span><span class="info-value">${teamData.group}</span></div>` : ''}
+                <div class="team-info-row">
+                    <span class="info-label">Top goalscorer</span>
+                    <span class="info-value">${teamData.topScorer}</span>
+                </div>
+            </div>
         `;
+        
+        teamCard.addEventListener('click', () => {
+            // Show players section and filter by this country
+            const playersSection = document.getElementById('players');
+            const countryFilter = document.getElementById('playersCountryFilter');
+            playersSection.style.display = 'block';
+            countryFilter.value = team.country;
+            displayPlayers(team.country);
+            playersSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
         teamsContainer.appendChild(teamCard);
     });
 }
@@ -78,107 +202,238 @@ async function displayTeams() {
 // Populate the dropdown filter with countries
 function populateCountryFilter() {
     const countryFilter = document.getElementById("countryFilter");
-    countryFilter.innerHTML = "<option value=''>Display All</option>"; // Add "Display All"
-    arabCupCountries.forEach(country => {
-        const option = document.createElement("option");
-        option.value = country;
-        option.textContent = country;
-        countryFilter.appendChild(option);
-    });
-}
-
-// Display Arab Cup Countries Table with Flags
-function displayArabCountries() {
-    const countriesTable = document.getElementById("countriesTable").getElementsByTagName('tbody')[0];
-    arabCupCountries.forEach(country => {
-        const row = countriesTable.insertRow();
-        const flagUrl = getFlag(country);
-        row.innerHTML = `
-            <td>${flagUrl ? `<img class="flag-icon" src="${flagUrl}" alt="${country} flag" loading="lazy">` : flagEmojiFallback}</td>
-            <td>${country}</td>
-        `;
-    });
+    const playersCountryFilter = document.getElementById("playersCountryFilter");
+    
+    // Use allowedTeamNames mapped to countries
+    const countries = allowedTeamNames.map(teamNameToCountry).sort();
+    
+    // Populate matches country filter
+    if (countryFilter) {
+        countryFilter.innerHTML = "<option value=''>Display All</option>";
+        countries.forEach(country => {
+            const option = document.createElement("option");
+            option.value = country;
+            option.textContent = country;
+            countryFilter.appendChild(option);
+        });
+    }
+    
+    // Populate players country filter
+    if (playersCountryFilter) {
+        playersCountryFilter.innerHTML = "<option value=''>Display All</option>";
+        countries.forEach(country => {
+            const option = document.createElement("option");
+            option.value = country;
+            option.textContent = country;
+            playersCountryFilter.appendChild(option);
+        });
+    }
 }
 
 // Fetch and display all matches
 async function displayMatches(country = '') {
     const response = await fetch(`${apiUrl}/api/matches/`);
-    const matches = await response.json();
+    const rawMatches = await response.json();
+    const matches = rawMatches.map(normalizeMatch);
     const matchesContainer = document.getElementById("allMatches");
 
-    if (!matchesLoaded) {
-        matchesContainer.innerHTML = "<p class='placeholder'>Click \"Sync Matches\" to load matches.</p>";
-        return;
-    }
+    const allowedCountries = new Set(arabCupCountries.length ? arabCupCountries : allowedTeamNames.map(teamNameToCountry));
 
-    let matchHtml = "";
-    matches.forEach(match => {
-        if (!country || match.home_team === country || match.away_team === country) {
+    const filtered = matches.filter(m => {
+        const inScope = allowedCountries.has(m.homeTeam) && allowedCountries.has(m.awayTeam);
+        const countryMatch = !country || m.homeTeam === country || m.awayTeam === country;
+        return inScope && countryMatch;
+    }).sort((a, b) => {
+        // Parse CSV date format: "Nov 25 2025 - 1:00pm"
+        const parseDate = (dateStr) => {
+            if (!dateStr || dateStr === 'Date N/A') return new Date(0);
+            // Extract just the date part before the dash
+            const datePart = dateStr.split(' - ')[0];
+            return new Date(datePart);
+        };
+        return parseDate(b.date) - parseDate(a.date);
+    });
+
+    // Group matches by date
+    const matchesByDate = {};
+    filtered.forEach(match => {
+        // Parse and format date from CSV format
+        let dateKey = 'Unknown Date';
+        if (match.date && match.date !== 'Date N/A') {
+            const datePart = match.date.split(' - ')[0];
+            const parsedDate = new Date(datePart);
+            if (!isNaN(parsedDate.getTime())) {
+                dateKey = parsedDate.toISOString().split('T')[0]; // YYYY-MM-DD
+            }
+        }
+        if (!matchesByDate[dateKey]) matchesByDate[dateKey] = [];
+        matchesByDate[dateKey].push(match);
+    });
+
+    let matchHtml = '';
+    Object.keys(matchesByDate).forEach(dateKey => {
+        const dateObj = new Date(dateKey);
+        const formattedDate = dateKey !== 'Unknown Date' ? 
+            dateObj.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 
+            'Unknown Date';
+        
+        matchHtml += `<div class="match-date-header">${formattedDate}</div>`;
+        
+        matchesByDate[dateKey].forEach(match => {
+            const homeFlag = getFlag(match.homeTeam);
+            const awayFlag = getFlag(match.awayTeam);
+            
+            // Determine match stage based on Game Week or other info
+            let matchStage = 'Qualification Stage';
+            if (match.gameWeek && match.gameWeek !== 'N/A') {
+                if (match.gameWeek === '1' || match.gameWeek === '2' || match.gameWeek === '3') {
+                    matchStage = `Group Stage - Matchday ${match.gameWeek}`;
+                } else {
+                    matchStage = 'Knockout Stage';
+                }
+            }
+            
             matchHtml += `
-                <div class="match-card">
-                    <h4>${match.home_team} vs ${match.away_team}</h4>
-                    <p>${match.date} | Score: ${match.home_score} - ${match.away_score}</p>
+                <div class="match-card-new">
+                    <div class="match-teams">
+                        <div class="match-team home">
+                            <span class="team-name">${match.homeTeam}</span>
+                            ${homeFlag ? `<img class="team-flag" src="${homeFlag}" alt="${match.homeTeam}">` : ''}
+                        </div>
+                        <div class="match-score">
+                            <span class="score">${match.homeScore}</span>
+                            <span class="ft-label">FT</span>
+                            <span class="score">${match.awayScore}</span>
+                        </div>
+                        <div class="match-team away">
+                            ${awayFlag ? `<img class="team-flag" src="${awayFlag}" alt="${match.awayTeam}">` : ''}
+                            <span class="team-name">${match.awayTeam}</span>
+                        </div>
+                    </div>
+                    <div class="match-info">
+                        ${matchStage} · Play-off${match.venue ? ' · ' + match.venue : ''}
+                    </div>
                 </div>
             `;
-        }
+        });
     });
-    matchesContainer.innerHTML = matchHtml;
+
+    matchesContainer.innerHTML = matchHtml || "<p>No matches available.</p>";
 }
 
-// Fetch and display players of each team (only Arab Cup teams)
-async function displayPlayers() {
-    const response = await fetch(`${apiUrl}/api/players/`);
-    const players = await response.json();
-    playersCache = players; // cache
+// Fetch and display players of each team (all are Arab Cup teams from CSV)
+async function displayPlayers(countryFilter = '') {
     const playersContainer = document.getElementById("playersList");
-
-    if (!playersLoaded) {
-        playersContainer.innerHTML = "<p class='placeholder'>Click \"Sync Players\" to load players.</p>";
-        return;
-    }
-
-    // Filter players based on Arab Cup teams
-    const filteredPlayers = players.filter(player => player.team && arabCupCountries.includes(player.team));
     
-    // Group players by country
-    const playersByCountry = {};
-    filteredPlayers.forEach(player => {
-        if (!playersByCountry[player.team]) {
-            playersByCountry[player.team] = [];
-        }
-        playersByCountry[player.team].push(player);
-    });
-
-    // Sort countries alphabetically
-    const sortedCountries = Object.keys(playersByCountry).sort();
-
-    let playerHtml = "";
-    sortedCountries.forEach(country => {
-        const flagUrl = getFlag(country);
-        const flag = flagUrl ? `<img class="flag-icon" src="${flagUrl}" alt="${country} flag" loading="lazy">` : flagEmojiFallback;
-
-        playerHtml += `<div class="country-section">
-            <h3>${flag} ${country}</h3>
-            <div class="players-grid">`;
+    try {
+        const response = await fetch(`${apiUrl}/api/players/`);
+        const players = await response.json();
         
-        playersByCountry[country].forEach(player => {
+        // Cache all players with normalized data for lineup view
+        playersCache = players.map(p => ({
+            ...p,
+            _country: p["Current Club"] || p.nationality || "",
+            _name: getPlayerName(p),
+            full_name: p["Full Name"] || p.full_name || getPlayerName(p),
+            name: getPlayerName(p),
+            position: p.position || "N/A"
+        }));
+        
+        // Filter by country if specified
+        let filteredPlayers = playersCache;
+        
+        if (countryFilter) {
+            filteredPlayers = filteredPlayers.filter(p => p._country === countryFilter);
+        }
+        
+        if (filteredPlayers.length === 0) {
+            playersContainer.innerHTML = `<p class='placeholder'>${countryFilter ? `No players found for ${countryFilter}` : 'Select a country to view players'}</p>`;
+            return;
+        }
+        
+        // Update lineup team selector to current country if a country is selected
+        if (countryFilter) {
+            const teamSelect = document.getElementById('lineupTeam');
+            if (teamSelect) {
+                teamSelect.value = countryFilter;
+            }
+        }
+        
+        // Categorize by position
+        const positionCategories = {
+            "Goalkeeper": [],
+            "Defender": [],
+            "Midfielder": [],
+            "Forward": []
+        };
+        
+        filteredPlayers.forEach(player => {
+            const pos = (player.position || "").toUpperCase();
+            if (pos.includes("GK") || pos.includes("GOALKEEPER")) {
+                positionCategories["Goalkeeper"].push(player);
+            } else if (pos.includes("DEF") || pos.includes("BACK")) {
+                positionCategories["Defender"].push(player);
+            } else if (pos.includes("MID")) {
+                positionCategories["Midfielder"].push(player);
+            } else if (pos.includes("FW") || pos.includes("FORWARD") || pos.includes("STRIKER") || pos.includes("ATTACK")) {
+                positionCategories["Forward"].push(player);
+            } else {
+                positionCategories["Midfielder"].push(player);
+            }
+        });
+        
+        const country = countryFilter || "All Teams";
+        const flagUrl = countryFilter ? getFlag(countryFilter) : "";
+        
+        let playerHtml = `
+            <div class="squad-header">
+                ${flagUrl ? `<img class="squad-flag" src="${flagUrl}" alt="${country}">` : ''}
+                <h2>${country} Squad</h2>
+            </div>
+        `;
+        
+        Object.keys(positionCategories).forEach(position => {
+            const posPlayers = positionCategories[position];
+            if (posPlayers.length === 0) return;
+            
             playerHtml += `
-                <div class="player-card">
-                    <h4>${player.name}</h4>
-                    <p>${player.position || 'N/A'}</p>
+                <div class="position-section">
+                    <h3 class="position-title">${position}s (${posPlayers.length})</h3>
+                    <div class="players-grid-simple">
+            `;
+            
+            posPlayers.forEach(player => {
+                const flagUrl = getFlag(player._country);
+                playerHtml += `
+                    <div class="player-card-simple">
+                        ${flagUrl ? `<img src="${flagUrl}" alt="${player._country}" class="player-flag-small">` : ''}
+                        <div class="player-info-simple">
+                            <div class="player-name">${player._name}</div>
+                            <div class="player-position">${player.position || 'N/A'}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            playerHtml += `
+                    </div>
                 </div>
             `;
         });
         
-        playerHtml += `</div></div>`;
-    });
-    
-    playersContainer.innerHTML = playerHtml || "<p>No players data available. Click 'Sync Players' to load data.</p>";
-
-    if (playersLoaded) {
-        renderCurrentLineup();
+        playersContainer.innerHTML = playerHtml;
+        
+        // Render the lineup after players are displayed
+        if (countryFilter) {
+            renderCurrentLineup();
+        }
+        
+    } catch (error) {
+        console.error('Error loading players:', error);
+        playersContainer.innerHTML = "<p class='placeholder'>Error loading players</p>";
     }
 }
+
 
 // Handle login form submission
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -195,15 +450,11 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
     if (response.ok) {
         const data = await response.json();
-        jwtToken = data.token; // Store the JWT token
+        jwtToken = data.token; // Store the JWT token (session only)
         document.getElementById('login').style.display = 'none';
-        document.getElementById('syncForms').style.display = 'block';
         document.getElementById('dashboard').style.display = 'block';
-        displayArabCountries(); // Display Arab Cup countries with flags
-        displayTeams(); // Placeholder until sync
-        displayMatches(); // Placeholder until sync
-        displayPlayers(); // Placeholder until sync
-        initLineupControls();
+        // Auto-load all data
+        await loadAllData();
     } else {
         alert("Invalid credentials");
     }
@@ -221,139 +472,60 @@ document.getElementById('countryFilter').addEventListener('change', (e) => {
     displayMatches(selectedCountry);
 });
 
-// Helper function to show sync status
-function showSyncStatus(message, progress = 0) {
-    const statusDiv = document.getElementById('syncStatus');
-    const statusMsg = document.getElementById('statusMessage');
-    const progressFill = document.getElementById('progressFill');
-    
-    statusDiv.style.display = 'block';
-    statusMsg.textContent = message;
-    progressFill.style.width = progress + '%';
+// Filter players by country
+const playersCountryFilterEl = document.getElementById('playersCountryFilter');
+if (playersCountryFilterEl) {
+    playersCountryFilterEl.addEventListener('change', (e) => {
+        displayPlayers(e.target.value);
+    });
 }
 
-// Helper function to hide sync status
-function hideSyncStatus() {
-    const statusDiv = document.getElementById('syncStatus');
-    statusDiv.style.display = 'none';
-}
-
-// Helper function to disable all sync buttons
-function disableSyncButtons() {
-    document.getElementById('syncTeamsBtn').disabled = true;
-    document.getElementById('syncMatchesBtn').disabled = true;
-    document.getElementById('syncPlayersBtn').disabled = true;
-}
-
-// Helper function to enable all sync buttons
-function enableSyncButtons() {
-    document.getElementById('syncTeamsBtn').disabled = false;
-    document.getElementById('syncMatchesBtn').disabled = false;
-    document.getElementById('syncPlayersBtn').disabled = false;
-}
-
-// Sync Teams Button
-document.getElementById('syncTeamsBtn').addEventListener('click', async () => {
-    disableSyncButtons();
-    showSyncStatus('Starting teams sync...', 25);
-    
+// Auto-load all data from CSV-based API
+async function loadAllData() {
+    console.log('loadAllData called');
     try {
-        showSyncStatus('Fetching teams from TheSportsDB...', 50);
-        const response = await fetch(`${apiUrl}/api/teams/sync`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${jwtToken}` }
-        });
-        
+        // Initialize countries and populate dropdowns first
+        await initializeCountries();
+        await displayTeams();
+        await displayMatches();
+        await displayPlayers();
+        if (window.StatisticsModule) {
+            await StatisticsModule.loadLeaderboards();
+        }
+        initLineupControls();
+        renderCurrentLineup();
+        console.log('All data loaded successfully');
+    } catch (error) {
+        console.error('Error loading data:', error);
+    }
+}
+
+// Country filter will be populated after login when dashboard loads
+
+// Load teams from database on page load
+async function initializeCountries() {
+    try {
+        const response = await fetch(`${apiUrl}/api/teams/`);
         if (response.ok) {
-            showSyncStatus('Teams synced successfully! 🎉', 100);
-            teamsLoaded = true;
-            await displayTeams();
-            setTimeout(() => {
-                hideSyncStatus();
-                alert('Teams synced successfully!');
-            }, 1500);
-        } else {
-            showSyncStatus('Failed to sync teams ❌', 0);
-            setTimeout(() => hideSyncStatus(), 2000);
-            alert('Failed to sync teams');
+            const teams = await response.json();
+            const allowedCountries = new Set(Object.keys(flagMap));
+            // Extract unique allowed countries from teams
+            arabCupCountries = [...new Set(teams.map(t => t.country).filter(c => allowedCountries.has(c)))].sort();
+            // Populate country filter dropdowns
+            populateCountryFilter();
         }
     } catch (error) {
-        showSyncStatus('Error syncing teams ❌', 0);
-        setTimeout(() => hideSyncStatus(), 2000);
-        console.error(error);
+        console.error('Error loading countries:', error);
     }
-    enableSyncButtons();
-});
+}
 
-// Sync Matches Button
-document.getElementById('syncMatchesBtn').addEventListener('click', async () => {
-    disableSyncButtons();
-    showSyncStatus('Starting matches sync...', 25);
-    
-    try {
-        showSyncStatus('Fetching matches from TheSportsDB...', 50);
-        const response = await fetch(`${apiUrl}/api/matches/sync`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${jwtToken}` }
-        });
-        
-        if (response.ok) {
-            showSyncStatus('Matches synced successfully! 🎉', 100);
-            matchesLoaded = true;
-            await displayMatches();
-            setTimeout(() => {
-                hideSyncStatus();
-                alert('Matches synced successfully!');
-            }, 1500);
-        } else {
-            showSyncStatus('Failed to sync matches ❌', 0);
-            setTimeout(() => hideSyncStatus(), 2000);
-            alert('Failed to sync matches');
-        }
-    } catch (error) {
-        showSyncStatus('Error syncing matches ❌', 0);
-        setTimeout(() => hideSyncStatus(), 2000);
-        console.error(error);
-    }
-    enableSyncButtons();
-});
+// Country filters will be populated after login when dashboard loads
 
-// Sync Players Button
-document.getElementById('syncPlayersBtn').addEventListener('click', async () => {
-    disableSyncButtons();
-    showSyncStatus('Starting players sync... This may take a minute ⏳', 10);
-    
-    try {
-        showSyncStatus('Fetching players from all teams... This may take a minute ⏳', 50);
-        const response = await fetch(`${apiUrl}/api/players/sync`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${jwtToken}` }
-        });
-        
-        if (response.ok) {
-            showSyncStatus('Saving players to database...', 75);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            showSyncStatus('Players synced successfully! 🎉', 100);
-            playersLoaded = true;
-            await displayPlayers();
-            setTimeout(() => {
-                hideSyncStatus();
-                alert('Players synced successfully!');
-            }, 1500);
-        } else {
-            showSyncStatus('Failed to sync players ❌', 0);
-            setTimeout(() => hideSyncStatus(), 2000);
-            alert('Failed to sync players');
-        }
-    } catch (error) {
-        showSyncStatus('Error syncing players ❌', 0);
-        setTimeout(() => hideSyncStatus(), 2000);
-        console.error(error);
-    }
-    enableSyncButtons();
+// Always show login page on page load (JWT is session-only)
+window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('login').style.display = 'block';
+    document.getElementById('dashboard').style.display = 'none';
 });
-
-populateCountryFilter(); // Populate the country filter dropdown on page load
 
 // ---------------------
 // Lineup / Cartography
@@ -390,13 +562,17 @@ const slotCoords = {
     }
 };
 
-const formationSelect = document.getElementById("lineupFormation");
-const teamSelect = document.getElementById("lineupTeam");
-const lineupStatus = document.getElementById("lineupStatus");
-const pitchEl = document.getElementById("pitch");
-const benchEl = document.getElementById("bench");
-
 function initLineupControls() {
+    // Initialize lineup controls on the main page
+    const formationSelect = document.getElementById("lineupFormation");
+    const teamSelect = document.getElementById("lineupTeam");
+    const lineupStatus = document.getElementById("lineupStatus");
+    
+    if (!formationSelect || !teamSelect || !lineupStatus) {
+        console.log('Lineup controls not found in HTML');
+        return; // Lineup controls not available
+    }
+    
     // Populate formation options
     formationSelect.innerHTML = "";
     Object.keys(formations).forEach((f) => {
@@ -443,20 +619,23 @@ function slotRole(slotName) {
 }
 
 function renderCurrentLineup() {
-    if (!playersLoaded) {
-        lineupStatus.textContent = "Load players to view the lineup.";
-        pitchEl.innerHTML = "";
-        benchEl.innerHTML = "";
-        return;
-    }
-
+    // Get element references
+    const formationSelect = document.getElementById("lineupFormation");
+    const teamSelect = document.getElementById("lineupTeam");
+    const lineupStatus = document.getElementById("lineupStatus");
+    const pitchEl = document.getElementById("pitch");
+    const benchEl = document.getElementById("bench");
+    
+    // Skip if lineup controls don't exist on this page
+    if (!teamSelect || !formationSelect || !pitchEl || !benchEl || !lineupStatus) return;
+    
     const team = teamSelect.value;
     const formation = formationSelect.value;
     if (!team || !formation) return;
 
     const slots = formations[formation];
     const coords = slotCoords[formation];
-    const teamPlayers = playersCache.filter(p => p.team === team);
+    const teamPlayers = playersCache.filter(p => (p._country || getPlayerCountry(p)) === team);
 
     // Buckets
     const buckets = { GK: [], DEF: [], MID: [], FWD: [], UNK: [] };
@@ -466,7 +645,11 @@ function renderCurrentLineup() {
     });
 
     // Deterministic order
-    Object.keys(buckets).forEach(key => buckets[key].sort((a, b) => a.name.localeCompare(b.name)));
+    Object.keys(buckets).forEach(key => buckets[key].sort((a, b) => {
+        const nameA = a._name || getPlayerName(a);
+        const nameB = b._name || getPlayerName(b);
+        return nameA.localeCompare(nameB);
+    }));
 
     const slotAssignments = {};
     const usedIds = new Set();
@@ -478,12 +661,15 @@ function renderCurrentLineup() {
         const pickFrom = primary.length ? primary : fallback.length ? fallback : buckets.UNK;
         const player = pickFrom.shift();
         if (player) {
+            const normalizedName = player._name || getPlayerName(player);
             slotAssignments[slot] = player;
-            usedIds.add(player.name);
+            usedIds.add(normalizedName);
         }
     });
 
-    const bench = teamPlayers.filter(p => !usedIds.has(p.name)).sort((a, b) => a.name.localeCompare(b.name));
+    const bench = teamPlayers
+        .filter(p => !usedIds.has(p._name || getPlayerName(p)))
+        .sort((a, b) => (a._name || getPlayerName(a)).localeCompare(b._name || getPlayerName(b)));
 
     // Render pitch
     pitchEl.innerHTML = "";
@@ -496,8 +682,8 @@ function renderCurrentLineup() {
         slotDiv.className = `slot ${player ? "" : "slot-empty"} role-${role.toLowerCase()}`;
         slotDiv.style.left = coord.x + "%";
         slotDiv.style.top = coord.y + "%";
-        slotDiv.title = player ? `${player.name} (${player.position || role})` : `${slot} (empty)`;
-        slotDiv.textContent = player ? player.name.split(" ").slice(0, 2).join(" ") : slot;
+        slotDiv.title = player ? `${player.full_name || player.name} (${player.position || role})` : `${slot} (empty)`;
+        slotDiv.textContent = player ? (player.full_name || player.name).split(" ").slice(0, 2).join(" ") : slot;
         pitchEl.appendChild(slotDiv);
     });
 
@@ -506,7 +692,7 @@ function renderCurrentLineup() {
     bench.forEach(p => {
         const chip = document.createElement("div");
         chip.className = "bench-chip";
-        chip.textContent = `${p.name} (${p.position || "UNK"})`;
+        chip.textContent = `${p.full_name || p.name} (${p.position || "UNK"})`;
         benchEl.appendChild(chip);
     });
 
