@@ -323,23 +323,7 @@ python app.py
 - **Query Performance**: Response times <500ms validated
 - **UI Rendering**: DOM updates across all components
 
-### Testing Methods
 
-**Manual Testing** (Postman/cURL):
-```bash
-# Login
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"password123"}'
-
-# Get teams (protected)
-curl -X GET http://localhost:5000/api/teams \
-  -H "Authorization: Bearer <your_token>"
-```
-
-**Automated Testing**: See `tests/TESTING.md` for unit and integration test details.
-
----
 
 ## 📊 Results & Performance
 
@@ -377,7 +361,7 @@ curl -X GET http://localhost:5000/api/teams \
 4. **No Real-Time Updates**: Match scores not live-updated
 5. **Limited Admin Features**: Basic CRUD only
 
-### Proposed Enhancements
+### Future Enhancements
 
 - 🚀 **Live Data Integration**: Web scraping or API feeds
 - 🚀 **Advanced Analytics**: Expected goals (xG), possession stats
@@ -385,8 +369,7 @@ curl -X GET http://localhost:5000/api/teams \
 - 🚀 **Mobile Native Apps**: React Native or Flutter clients
 - 🚀 **Machine Learning**: Match outcome predictions
 - 🚀 **Rate Limiting**: Flask-Limiter for API protection
-- 🚀 **Caching Layer**: Redis for frequently accessed data
-- 🚀 **API Documentation**: Swagger/OpenAPI specification
+  
 
 ---
 
