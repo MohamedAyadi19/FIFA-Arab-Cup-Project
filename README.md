@@ -4,13 +4,142 @@ A full-stack web application delivering football team statistics, player insight
 
 ---
 
-## 📋 Project Overview
+## 🎯 Purpose & Objectives
 
-**Purpose**: Centralize FIFA Arab Cup tournament data into a consistent, queryable platform that eliminates inconsistent naming conventions and manual data cleaning.
+### Purpose
+Centralize FIFA Arab Cup tournament data into a consistent, queryable platform that eliminates inconsistent naming conventions and manual data cleaning. This project demonstrates practical application of web services, database design, and REST API development for academic coursework at Tunis Business School.
 
-**Academic Focus**: Demonstrates REST API design, relational data modeling, service layer architecture, and reproducible data pipelines for web services coursework at Tunis Business School.
+### Key Objectives
+1. **Data Normalization** - Transform raw CSV data into a normalized relational database (3NF)
+2. **REST API Development** - Build a secure, scalable API following REST principles
+3. **Authentication & Security** - Implement JWT-based authentication for protected resources
+4. **Automated Data Pipeline** - Create reproducible CSV-to-database import workflows
+5. **Interactive Frontend** - Develop a responsive web interface for data visualization
+6. **Containerization** - Deploy using Docker for consistency across environments
 
-**Key Innovation**: Automated CSV-to-database pipeline with strict normalization ensures relational integrity across teams, players, and matches.
+### Academic Learning Goals
+- Master REST API design patterns and HTTP methods
+- Understand relational database modeling and normalization
+- Implement service layer architecture and separation of concerns
+- Practice secure authentication and authorization
+- Apply data engineering principles for reproducible pipelines
+
+---
+
+## 🚀 How to Run
+
+### Prerequisites
+- Python 3.8 or higher
+- Docker & Docker Compose (recommended for production-like setup)
+- Git
+
+---
+
+### Option 1: Docker Setup (Recommended)
+
+**Step 1: Clone the repository**
+```bash
+git clone https://github.com/MohamedAyadi19/FIFA-Arab-Cup-Project.git
+cd updated_arab_cup
+```
+
+**Step 2: Create environment file**
+```bash
+# Windows (PowerShell)
+@"
+SECRET_KEY=your_secret_key_minimum_32_characters_long
+DATABASE_URL=postgresql://postgres:postgres@db:5432/arab_cup
+FLASK_ENV=development
+"@ | Out-File -FilePath .env -Encoding utf8
+
+# Windows (Command Prompt)
+echo SECRET_KEY=your_secret_key_minimum_32_characters_long > .env
+echo DATABASE_URL=postgresql://postgres:postgres@db:5432/arab_cup >> .env
+echo FLASK_ENV=development >> .env
+```
+
+**Step 3: Start services**
+```bash
+docker-compose up --build
+```
+
+**Step 4: Initialize database (in a new terminal)**
+```bash
+# Wait 10 seconds for PostgreSQL to start
+docker-compose exec backend python init_db.py
+docker-compose exec backend python import_data.py
+```
+
+**Step 5: Access application**
+- Open browser to `http://localhost:5000`
+- Default login credentials:
+  - Username: `admin`
+  - Password: `admin123`
+
+---
+
+### Option 2: Local Development Setup
+
+**Step 1: Clone the repository**
+```bash
+git clone https://github.com/MohamedAyadi19/FIFA-Arab-Cup-Project.git
+cd updated_arab_cup
+```
+
+**Step 2: Create virtual environment**
+```bash
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# Linux/Mac
+source venv/bin/activate
+```
+
+**Step 3: Install dependencies**
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+**Step 4: Configure environment variables**
+```bash
+# Windows (PowerShell)
+$env:SECRET_KEY="your_secret_key_minimum_32_characters_long"
+$env:DATABASE_URL="sqlite:///arab_cup.db"
+$env:FLASK_ENV="development"
+
+# Windows (Command Prompt)
+set SECRET_KEY=your_secret_key_minimum_32_characters_long
+set DATABASE_URL=sqlite:///arab_cup.db
+set FLASK_ENV=development
+```
+
+**Step 5: Initialize database and import data**
+```bash
+python init_db.py
+python import_data.py
+```
+
+**Step 6: Run the application**
+```bash
+python app.py
+```
+
+**Step 7: Access application**
+- Open browser to `http://localhost:5000`
+- Default login credentials:
+  - Username: `admin`
+  - Password: `admin123`
+
+---
+
+
+**Import data fails:**
+- Verify CSV files are present: `teams.csv`, `players.csv`, `matches.csv`
+- Check file encoding is UTF-8
+- Review import logs for specific error messages
 
 ---
 
@@ -72,152 +201,9 @@ A full-stack web application delivering football team statistics, player insight
 └─────────────────────────────────────────┘
 ```
 
-**Data Flow**: User interaction → HTTP request → JWT validation → Service layer → SQLAlchemy ORM → PostgreSQL → JSON response → DOM update
-
 ---
 
-## 🗄️ Database Design
 
-### Entity-Relationship Model
-
-```
-┌─────────────┐
-│    Users    │  (Authentication)
-└─────────────┘
-
-┌─────────────┐    1:1    ┌──────────────────┐
-│    Teams    │◄──────────┤  TeamStatistics  │
-│─────────────│           │──────────────────│
-│ id (PK)     │           │ team_id (FK)     │
-│ team_id (UQ)│           │ wins, draws, etc │
-│ name        │           └──────────────────┘
-└──────┬──────┘
-       │ 1:N
-       ▼
-┌─────────────┐    1:1    ┌──────────────────┐
-│   Players   │◄──────────┤ PlayerStatistics │
-│─────────────│           │──────────────────│
-│ id (PK)     │           │ player_id (FK)   │
-│ player_id   │           │ goals, assists   │
-│ team_id (FK)│           └──────────────────┘
-└─────────────┘
-
-┌─────────────┐
-│   Matches   │
-│─────────────│
-│ id (PK)     │
-│ home_team_id├───┐
-│ away_team_id├───┤ (Both FK → Teams)
-│ scores, date│   │
-└─────────────┘   │
-                  ▼
-            (References Teams)
-```
-
-**Normalization**: Third Normal Form (3NF) - eliminates redundancy, team names stored once and referenced via foreign keys.
-
-**Integrity**: Foreign key constraints prevent orphaned records. Players must reference valid teams; matches require two valid team IDs.
-
-**Performance**: B-tree indexes on PKs and FKs; composite indexes on frequently queried fields (team_id, position).
-
----
-
-## 🌐 REST API Design
-
-### Core Endpoints
-
-| Endpoint | Method | Auth | Description |
-|----------|--------|------|-------------|
-| `/api/auth/login` | POST | ❌ | Returns JWT token |
-| `/api/teams` | GET | ✅ | List all teams with stats |
-| `/api/players` | GET | ✅ | List players (filterable) |
-| `/api/matches` | GET | ✅ | Match history with scores |
-| `/api/statistics/teams/{name}` | GET | ✅ | Detailed team metrics |
-| `/api/statistics/league` | GET | ✅ | Tournament-level aggregates |
-| `/api/leaderboards/top-scorers` | GET | ✅ | Top goal scorers |
-| `/api/leaderboards/standings` | GET | ✅ | Tournament standings |
-
-### Design Principles
-
-- **Resource-Based URLs**: Each endpoint represents a logical resource
-- **HTTP Methods**: Standard verbs (GET, POST, PUT, DELETE)
-- **Stateless**: JWT tokens contain all auth context
-- **JSON Format**: All requests/responses in JSON
-- **Status Codes**: Proper use of 200, 201, 400, 401, 404, 500
-
-### Example Response
-
-```json
-GET /api/teams
-[
-  {
-    "id": 1,
-    "team_id": "12345",
-    "name": "Egypt",
-    "country": "Egypt",
-    "badge": "https://example.com/egypt.png",
-    "wins": 3,
-    "draws": 1,
-    "losses": 0,
-    "goals_scored": 8,
-    "goals_conceded": 2
-  }
-]
-```
-
----
-
-## 🔐 Security
-
-### JWT Authentication
-
-1. **Login**: User submits credentials to `/api/auth/login`
-2. **Token Generation**: Server validates and returns JWT with:
-   - `user_id`: User identifier
-   - `exp`: Expiration (2 hours)
-   - HMAC-SHA256 signature
-3. **Storage**: Client stores token (localStorage)
-4. **Protected Requests**: Client includes `Authorization: Bearer <token>` header
-5. **Validation**: Server validates token signature and expiration on each request
-
-### Security Measures
-
-- ✅ **Password Hashing**: Werkzeug for secure storage
-- ✅ **SQL Injection Prevention**: SQLAlchemy parameterized queries
-- ✅ **CORS Configuration**: Proper cross-origin headers
-- ✅ **Input Validation**: Service layer validates all inputs
-- ⚠️ **Rate Limiting**: Not implemented (future work)
-
----
-
-## 🔄 Data Import Pipeline
-
-**Purpose**: Deterministic CSV-to-database workflow ensuring reproducibility.
-
-### Four-Stage Process
-
-1. **Validation**
-   - Check file presence and required columns
-   - Validate numeric conversions
-   - Skip invalid rows with logging
-
-2. **Cleaning**
-   - Trim whitespace
-   - Normalize team identifiers (e.g., "MOR" → "Morocco")
-   - Parse dates to standard format
-   - Apply defaults for missing values
-
-3. **Population**
-   - Clear tables in FK-safe order
-   - Insert teams → players → matches
-   - Compute aggregated statistics
-
-4. **Verification**
-   - Enforce referential integrity
-   - Verify record counts
-   - Emit import summary for audit
-
-**Idempotency**: Running pipeline multiple times produces identical database state.
 
 ---
 
@@ -259,72 +245,6 @@ GET /api/teams
 
 ---
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Python 3.8+
-- Docker & Docker Compose (recommended)
-- Git
-
-### Quick Start (Docker)
-
-```bash
-# Clone repository
-git clone https://github.com/MohamedAyadi19/FIFA-Arab-Cup-Project.git
-cd FIFA-Arab-Cup-Project
-
-# Create .env file
-cat > .env << EOF
-SECRET_KEY=your_secret_key_minimum_32_characters
-DATABASE_URL=postgresql://postgres:postgres@db:5432/arab_cup
-FLASK_ENV=development
-EOF
-
-# Start services
-docker-compose up --build
-
-# Application available at http://localhost:5000
-```
-
-### Manual Setup
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install dependencies
-cd backend
-pip install -r requirements.txt
-
-# Configure environment
-export SECRET_KEY="your_secret_key"
-export DATABASE_URL="sqlite:///arab_cup.db"
-
-# Initialize database and import data
-python init_db.py
-python import_data.py
-
-# Run application
-python app.py
-```
-
----
-
-## ✅ Testing
-
-### Test Coverage
-
-- **API Endpoints**: All routes tested (100% coverage)
-- **Authentication**: JWT generation and validation
-- **Data Integrity**: Foreign key constraints verified
-- **CRUD Operations**: Create, Read, Update, Delete for all entities
-- **Query Performance**: Response times <500ms validated
-- **UI Rendering**: DOM updates across all components
-
-
-
 ## 📊 Results & Performance
 
 ### Achievements
@@ -338,61 +258,9 @@ python app.py
 - ✅ Mobile-responsive design
 - ✅ JWT authentication with 2-hour token TTL
 
-### Metrics
-
-| Metric | Value |
-|--------|-------|
-| API Response Time | <500ms |
-| Test Pass Rate | 100% |
-| Database Tables | 6 |
-| API Endpoints | 15+ |
-| Frontend Components | 4 main features |
-| Data Normalization | 3NF |
-
 ---
 
-## ⚠️ Limitations & Future Work
-
-### Current Limitations
-
-1. **Static Dataset**: Requires manual CSV refresh for updates
-2. **Basic Analytics**: Limited to aggregates (no xG models, heat maps)
-3. **Single Tournament**: Arab Cup only (no multi-tournament support)
-4. **No Real-Time Updates**: Match scores not live-updated
-5. **Limited Admin Features**: Basic CRUD only
-
-### Future Enhancements
-
-- 🚀 **Live Data Integration**: Web scraping or API feeds
-- 🚀 **Advanced Analytics**: Expected goals (xG), possession stats
-- 🚀 **Multi-Tournament Support**: Extend schema for multiple competitions
-- 🚀 **Mobile Native Apps**: React Native or Flutter clients
-- 🚀 **Machine Learning**: Match outcome predictions
-- 🚀 **Rate Limiting**: Flask-Limiter for API protection
-  
-
----
-
-## 📚 Academic Context
-
-This project demonstrates understanding of:
-
-- **REST API Design**: Resource-based endpoints, HTTP methods, stateless communication
-- **Relational Databases**: ER modeling, normalization (3NF), foreign keys
-- **Backend Development**: Flask application factory, service layer, ORM usage
-- **Authentication**: JWT token generation, validation, secure sessions
-- **Data Engineering**: CSV processing, normalization, reproducible pipelines
-- **Frontend Integration**: API consumption, DOM manipulation, responsive design
-- **Containerization**: Docker for consistent deployment environments
-- **Software Engineering**: Separation of concerns, modular architecture, testing
-
-**Course**: Web Services  
-**Institution**: Tunis Business School  
-**Instructor Evaluation**: [Pending]
-
----
-
-## 👨‍💻 Author
+# 👨‍💻 Author
 
 **Mohamed Ayadi**  
 📧 ayadimed159@gmail.com  
@@ -406,14 +274,3 @@ This project demonstrates understanding of:
 This project is open source and available under the MIT License.
 
 ---
-
-## 🙏 Acknowledgments
-
-- Tunis Business School Web Services Course
-- FIFA Arab Cup for domain inspiration
-- Flask and SQLAlchemy communities
-- PostgreSQL documentation
-
----
-
-**⚽ Built with passion for football analytics and clean architecture.**
